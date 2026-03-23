@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "release-clean"
+version = "0.0.0"
+description = "Interactive Git release cleanup and checkout utility."
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+authors = [
+  { name = "Andre Argolo", email = "mail@argolo.dev" }
+]
+
+[project.scripts]
+release-pilot = "release_pilot:main"
+
+[tool.setuptools]
+py-modules = ["release_pilot"]
