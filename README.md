@@ -17,9 +17,6 @@ Its goal is simple and critical:
 
 > Ensure that your local environment is **clean, consistent, and aligned with the correct release version**, eliminating any hidden state that could compromise reliability.
 
-Release Clean does **not automate blindly**.
-It enforces **controlled execution**, requiring explicit confirmation before any destructive operation.
-
 ---
 
 ## 🎯 Purpose
@@ -30,20 +27,22 @@ Release Clean was created to solve a common and dangerous problem in release wor
 
 Typical risks include:
 
-* Residual build artifacts (`ios`, `android`, `dist`)
-* Untracked or partially reverted changes
-* Outdated branches
-* Inconsistent local state across team members
+* Residual build artifacts
+* Ignored files affecting runtime behavior
+* Untracked inconsistencies between developers
+* Dirty working trees
+* Outdated local branches
 
-The answer is not convenience — it is **deterministic cleanup and controlled execution**.
+The solution is not manual cleanup — it is **deterministic cleanup based on the repository state**.
 
 ---
 
 ## ✨ Key Features
 
-* 🧹 Automatic cleanup of local build directories:
+* 🧹 Cleanup based on `.gitignore`:
 
-  * `ios`, `android`, `dist`
+  * uses `git clean -fdX`
+* 🧩 Preserves `node_modules/` to improve developer experience
 * 🔄 Reset of tracked changes:
 
   * `git checkout -- .`
@@ -64,18 +63,18 @@ The answer is not convenience — it is **deterministic cleanup and controlled e
 
 ## 🧠 Operational Philosophy
 
-Release Clean is built around a strict principle:
+Release Clean follows a strict principle:
 
-> **A release environment must be deterministic.**
+> **The only reliable environment is a deterministic environment.**
 
-It ensures that:
+Instead of relying on manual cleanup or assumptions, the tool ensures that:
 
-* No residual files interfere with the build or execution
-* No local changes silently affect behavior
-* The correct branch is always used
-* The operator is always aware of what is happening
+* Cleanup is aligned with `.gitignore`
+* The working tree is fully reset
+* The correct branch is used
+* No hidden state leaks into the release
 
-This tool enforces **discipline before action**.
+This ensures **consistency across machines, teams, and environments**.
 
 ---
 
@@ -84,25 +83,76 @@ This tool enforces **discipline before action**.
 Release Clean executes the following sequence:
 
 ```bash
-rm -rf ios
-rm -rf dist
-rm -rf android
+git clean -fdX -e node_modules/
 git checkout -- .
 git checkout main
 git pull
 git fetch --all
 git checkout release/<VERSION>
+git checkout -- .
 git pull origin release/<VERSION>
 ```
 
-This sequence is **intentional and ordered**:
+---
 
-1. Clean local artifacts
-2. Reset tracked changes
-3. Synchronize base branch (`main`)
-4. Fetch all references
-5. Move to target release
-6. Ensure release branch is up to date
+## 🔍 Workflow Breakdown
+
+### 1. Clean ignored files
+
+```bash
+git clean -fdX -e node_modules/
+```
+
+* Removes all files listed in `.gitignore`
+* Preserves `node_modules/` to avoid unnecessary reinstalls
+
+---
+
+### 2. Reset tracked changes
+
+```bash
+git checkout -- .
+```
+
+* Discards all tracked local changes
+
+---
+
+### 3. Synchronize base branch
+
+```bash
+git checkout main
+git pull
+git fetch --all
+```
+
+* Ensures `main` is up to date
+
+---
+
+### 4. Switch to release branch
+
+```bash
+git checkout release/<VERSION>
+```
+
+---
+
+### 5. Enforce clean state on release
+
+```bash
+git checkout -- .
+```
+
+* Guarantees no local state leaks into the release branch
+
+---
+
+### 6. Update release branch
+
+```bash
+git pull origin release/<VERSION>
+```
 
 ---
 
@@ -210,30 +260,15 @@ release-clean
 
 ---
 
-### Flow
+## 🔄 Execution Flow
 
-1. Prompt for version:
-
-```text
-Enter version (e.g. 2.100.1 or 2.100.1-hotfix)
-```
-
+1. Prompt for version
 2. Validate version format
-
 3. Validate Git repository
-
-4. Show execution plan
-
-5. Ask for confirmation:
-
-```text
-Continue? [y/N]
-```
-
+4. Display execution plan
+5. Request confirmation (`y/N`)
 6. Execute workflow
-
-7. Stop on first failure (if any)
-
+7. Stop on first failure
 8. Print final summary
 
 ---
@@ -255,6 +290,40 @@ Invalid examples:
 
 ---
 
+## ⚠️ Important Behavior
+
+### 🔥 Cleanup behavior
+
+```bash
+git clean -fdX -e node_modules/
+```
+
+This means:
+
+| Type of file       | Behavior    |
+| ------------------ | ----------- |
+| `.gitignore` files | ❌ removed   |
+| tracked files      | ❌ reset     |
+| `node_modules/`    | ✅ preserved |
+
+---
+
+### ⚠️ Destructive actions
+
+The tool will:
+
+* remove ignored files
+* discard tracked changes
+* change branches
+
+Execution only proceeds with explicit confirmation:
+
+```bash
+Continue? [y/N]
+```
+
+---
+
 ## 📊 Execution Summary
 
 At the end, Release Clean prints:
@@ -266,32 +335,26 @@ At the end, Release Clean prints:
 * ❌ Failed actions
 * 📋 Full command list in execution order
 
-This improves:
-
-* auditability
-* reproducibility
-* communication with team
-
 ---
 
 ## 🛡️ Ideal Use Cases
 
 * Preparing local environment before a release
-* Avoiding “works on my machine” scenarios
-* Teams working with release branches (`release/x.y.z`)
-* CI/CD validation steps (manual or scripted)
-* Regulated or critical systems where consistency matters
+* Eliminating “works on my machine” issues
+* Teams using `release/<version>` strategy
+* Multi-developer environments
+* Regulated or mission-critical systems
 
 ---
 
 ## 🔮 Future Enhancements
 
-* `--dry-run` mode
-* `--version` flag (non-interactive)
+* `--dry-run` mode (preview cleanup)
+* `--version` (non-interactive execution)
 * `--no-color`
-* `--branch-base` (support `master`)
-* CI mode (`--yes`)
-* Exportable summary (`.md`, `.txt`)
+* `--ci` (auto-confirm)
+* Configurable exclusions (`--exclude node_modules`)
+* Summary export (`.md`, `.txt`)
 * Integration with:
 
   * Slack
@@ -318,13 +381,22 @@ CTO • Software Architect • DevOps
 
 ## 🧭 About
 
-Release Clean reflects a fundamental principle in software engineering:
+Release Clean embodies a key engineering principle:
 
-> **Reliability starts before execution — it starts with a clean state.**
+> **A clean environment is not optional — it is a prerequisite for reliability.**
 
-In complex and mission-critical systems, subtle inconsistencies in local environments can lead to unpredictable behavior, hidden bugs, and costly debugging cycles.
+In modern development, subtle local inconsistencies can lead to:
 
-Release Clean exists to eliminate that risk.
+* hidden bugs
+* inconsistent builds
+* unreliable validations
 
-It is a small tool with a strong purpose:
-**enforce consistency, reduce uncertainty, and protect the integrity of your release process.**
+Release Clean eliminates that risk by enforcing:
+
+* deterministic cleanup
+* explicit control
+* reproducible state
+
+It is a minimal tool with a strong purpose:
+
+**protect the integrity of your release process.**
