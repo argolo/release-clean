@@ -2,7 +2,7 @@
 """
 Release Clean
 
-Interactive utility to clean local artifacts, reset tracked changes,
+Interactive utility to clean local ignored artifacts, reset tracked changes,
 synchronize Git references, and switch to a target release branch.
 
 The tool is intentionally conservative:
@@ -33,10 +33,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from pathlib import Path
 import os
+from pathlib import Path
 import re
-import shutil
 import subprocess
 import sys
 from typing import Sequence
@@ -104,7 +103,7 @@ class CommandResult:
     success:
         Whether the action completed successfully.
     returncode:
-        Process return code, or 0 for internal file operations that succeeded.
+        Process return code.
     stdout:
         Captured standard output.
     stderr:
@@ -237,10 +236,6 @@ def confirm(prompt: str = "Continue? [y/N]: ") -> bool:
     Ask for an explicit yes/no confirmation.
 
     Only the exact value ``y`` confirms execution.
-
-    Examples
-    --------
-    The function is interactive and therefore not doctested directly.
     """
     return input(prompt).strip().lower() == "y"
 
@@ -355,56 +350,27 @@ def run_command(command: Sequence[str], ctx: ExecutionContext) -> CommandResult:
     return result
 
 
-def remove_path(path: Path, ctx: ExecutionContext) -> CommandResult:
+def planned_commands(release_branch: str) -> list[str]:
     """
-    Remove a path in a way equivalent to ``rm -rf <name>``.
+    Return the ordered list of actions that define the workflow.
 
-    The path is removed if it exists. Missing paths are treated as a
-    successful no-op.
-
-    Parameters
-    ----------
-    path:
-        Path to remove.
-    ctx:
-        Shared execution context.
-
-    Returns
-    -------
-    CommandResult
-        Action result.
-
-    Raises
-    ------
-    ReleaseCleanError
-        If removal fails.
+    Examples
+    --------
+    >>> planned_commands("release/2.100.1")[0]
+    'git clean -fdX -e node_modules/'
+    >>> planned_commands("release/2.100.1")[-1]
+    'git pull origin release/2.100.1'
     """
-    action = f"rm -rf {path.name}"
-    ctx.executed_commands.append(action)
-    log_action(ctx, f"[EXEC] {action}")
-
-    try:
-        if path.exists():
-            if path.is_dir():
-                shutil.rmtree(path)
-            else:
-                path.unlink()
-            stdout = "Removed."
-        else:
-            stdout = "Path does not exist. Nothing to remove."
-    except OSError as exc:
-        raise ReleaseCleanError(f"Failed to remove '{path}': {exc}") from exc
-
-    result = CommandResult(
-        command=action,
-        success=True,
-        returncode=0,
-        stdout=stdout,
-    )
-    ctx.results.append(result)
-
-    log_action(ctx, f"[OK] {stdout}")
-    return result
+    return [
+        "git clean -fdX -e node_modules/",
+        "git checkout -- .",
+        "git checkout main",
+        "git pull",
+        "git fetch --all",
+        f"git checkout {release_branch}",
+        "git checkout -- .",
+        f"git pull origin {release_branch}",
+    ]
 
 
 def print_plan(ctx: ExecutionContext) -> None:
@@ -420,34 +386,11 @@ def print_plan(ctx: ExecutionContext) -> None:
     for index, command in enumerate(planned_commands(ctx.release_branch), start=1):
         print(f"{index}. {command}")
 
-    print("\nWarning: this will discard tracked local changes and remove local paths:")
-    print("- ios")
-    print("- dist")
-    print("- android")
-
-
-def planned_commands(release_branch: str) -> list[str]:
-    """
-    Return the ordered list of actions that define the workflow.
-
-    Examples
-    --------
-    >>> planned_commands("release/2.100.1")[0]
-    'rm -rf ios'
-    >>> planned_commands("release/2.100.1")[-1]
-    'git pull origin release/2.100.1'
-    """
-    return [
-        "rm -rf ios",
-        "rm -rf dist",
-        "rm -rf android",
-        "git checkout -- .",
-        "git checkout main",
-        "git pull",
-        "git fetch --all",
-        f"git checkout {release_branch}",
-        f"git pull origin {release_branch}",
-    ]
+    print("\nWarning: this will discard tracked changes and remove ignored files.")
+    print("Preserved from cleanup:")
+    print("- node_modules/")
+    print("\nIgnored files cleanup command:")
+    print("- git clean -fdX -e node_modules/")
 
 
 def print_final_summary(ctx: ExecutionContext) -> None:
@@ -473,8 +416,9 @@ def print_final_summary(ctx: ExecutionContext) -> None:
 
     print("\nStatus:")
     print(
-        "Execution completed successfully. The local environment was cleaned, "
-        "main was synchronized, and the requested release branch was checked out."
+        "Execution completed successfully. Ignored files were cleaned "
+        "(preserving node_modules/), main was synchronized, and the "
+        "requested release branch was checked out."
     )
 
 
@@ -492,17 +436,15 @@ def execute_workflow(ctx: ExecutionContext) -> None:
     ReleaseCleanError
         If any step fails.
     """
-    repo_root = Path(ctx.repo_root)
+    _ = Path(ctx.repo_root)
 
-    remove_path(repo_root / "ios", ctx)
-    remove_path(repo_root / "dist", ctx)
-    remove_path(repo_root / "android", ctx)
-
+    run_command(["git", "clean", "-fdX", "-e", "node_modules/"], ctx)
     run_command(["git", "checkout", "--", "."], ctx)
     run_command(["git", "checkout", "main"], ctx)
     run_command(["git", "pull"], ctx)
     run_command(["git", "fetch", "--all"], ctx)
     run_command(["git", "checkout", ctx.release_branch], ctx)
+    run_command(["git", "checkout", "--", "."], ctx)
     run_command(["git", "pull", "origin", ctx.release_branch], ctx)
 
 
