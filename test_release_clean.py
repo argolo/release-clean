@@ -8,19 +8,19 @@ from release_clean.cli import (
 
 
 def test_is_valid_version_accepts_supported_formats():
-    assert is_valid_version("1.0.0")
-    assert is_valid_version("2.100.1")
-    assert is_valid_version("2.100.1-hotfix")
-    assert is_valid_version("3.4.5-rc1")
+    assert is_valid_version("1.0.0") is True
+    assert is_valid_version("2.100.1") is True
+    assert is_valid_version("2.100.1-hotfix") is True
+    assert is_valid_version("3.4.5-rc1") is True
 
 
 def test_is_valid_version_rejects_invalid_formats():
-    assert not is_valid_version("")
-    assert not is_valid_version("1.0")
-    assert not is_valid_version("release/1.0.0")
-    assert not is_valid_version("v1.0.0")
-    assert not is_valid_version("1.0.0/")
-    assert not is_valid_version("abc")
+    assert is_valid_version("") is False
+    assert is_valid_version("1.0") is False
+    assert is_valid_version("release/1.0.0") is False
+    assert is_valid_version("v1.0.0") is False
+    assert is_valid_version("1.0.0/") is False
+    assert is_valid_version("abc") is False
 
 
 def test_format_release_branch():
@@ -28,39 +28,37 @@ def test_format_release_branch():
     assert format_release_branch("2.100.1-hotfix") == "release/2.100.1-hotfix"
 
 
-def test_planned_commands_returns_expected_order():
-    release_branch = "release/2.100.1"
-    commands = planned_commands(release_branch)
-
-    assert commands == [
-        "git clean -fdX -e node_modules/",
-        "git checkout -- .",
-        "git checkout main",
-        "git pull",
-        "git fetch --all",
-        "git checkout release/2.100.1",
-        "git checkout -- .",
-        "git pull origin release/2.100.1",
-    ]
+def test_planned_commands_has_expected_length():
+    commands = planned_commands("release/2.100.1")
+    assert len(commands) == 8
 
 
 def test_planned_commands_starts_with_git_clean_preserving_node_modules():
     commands = planned_commands("release/2.100.1")
-
     assert commands[0] == "git clean -fdX -e node_modules/"
+
+
+def test_planned_commands_contains_main_sync_steps_in_order():
+    commands = planned_commands("release/2.100.1")
+
+    assert commands[1] == "git checkout -- ."
+    assert commands[2] == "git checkout main"
+    assert commands[3] == "git pull"
+    assert commands[4] == "git fetch --all"
 
 
 def test_planned_commands_resets_after_release_checkout():
     release_branch = "release/2.100.1"
     commands = planned_commands(release_branch)
 
-    checkout_index = commands.index(f"git checkout {release_branch}")
-    assert commands[checkout_index + 1] == "git checkout -- ."
+    release_checkout_index = commands.index(f"git checkout {release_branch}")
+
+    assert commands[release_checkout_index] == f"git checkout {release_branch}"
+    assert commands[release_checkout_index + 1] == "git checkout -- ."
 
 
 def test_planned_commands_ends_with_release_pull():
     commands = planned_commands("release/2.100.1")
-
     assert commands[-1] == "git pull origin release/2.100.1"
 
 
