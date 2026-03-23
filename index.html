@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Release Clean — Deterministic Git cleanup and release checkout</title>
+  <meta name="description" content="Release Clean is a deterministic Git utility designed to clean, reset, and position your local repository into a trusted release state before working on a specific release branch." />
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #121933;
+      --panel-2: #182244;
+      --text: #eef2ff;
+      --muted: #b9c2e0;
+      --line: rgba(255,255,255,0.12);
+      --brand: #ff4fd8;
+      --brand-2: #7c5cff;
+      --ok: #7ee787;
+      --warn: #ffd866;
+      --shadow: 0 20px 60px rgba(0,0,0,0.35);
+      --radius: 20px;
+      --max: 1140px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top right, rgba(124,92,255,0.18), transparent 26%),
+        radial-gradient(circle at top left, rgba(255,79,216,0.18), transparent 24%),
+        var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    code, pre {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    }
+
+    .container {
+      width: min(calc(100% - 32px), var(--max));
+      margin: 0 auto;
+    }
+
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      backdrop-filter: blur(16px);
+      background: rgba(11, 16, 32, 0.72);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .nav-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 14px 0;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 800;
+      letter-spacing: 0.2px;
+    }
+
+    .brand-badge {
+      width: 40px;
+      height: 40px;
+      display: grid;
+      place-items: center;
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+      box-shadow: var(--shadow);
+      font-size: 20px;
+    }
+
+    .nav-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .nav-links a,
+    .button,
+    .ghost {
+      border: 1px solid var(--line);
+      padding: 10px 14px;
+      border-radius: 999px;
+      transition: 180ms ease;
+    }
+
+    .button {
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+      border: none;
+      font-weight: 700;
+      color: white;
+      box-shadow: var(--shadow);
+    }
+
+    .ghost:hover,
+    .nav-links a:hover {
+      background: rgba(255,255,255,0.06);
+      transform: translateY(-1px);
+    }
+
+    .button:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.05);
+    }
+
+    .hero {
+      padding: 76px 0 48px;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 28px;
+      align-items: center;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255,255,255,0.04);
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    h1 {
+      margin: 18px 0 14px;
+      font-size: clamp(2.5rem, 6vw, 4.6rem);
+      line-height: 0.98;
+      letter-spacing: -0.04em;
+    }
+
+    .lead {
+      font-size: 1.08rem;
+      color: var(--muted);
+      max-width: 720px;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 26px;
+    }
+
+    .hero-card,
+    .card,
+    .code-card {
+      background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.03));
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .hero-card {
+      padding: 22px;
+    }
+
+    .terminal {
+      border-radius: 18px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      background: #0a0f1f;
+    }
+
+    .terminal-top {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,0.03);
+    }
+
+    .dot { width: 10px; height: 10px; border-radius: 999px; }
+    .dot.red { background: #ff5f57; }
+    .dot.yellow { background: #ffbd2e; }
+    .dot.green { background: #28c840; }
+
+    .terminal pre {
+      margin: 0;
+      padding: 18px;
+      overflow-x: auto;
+      color: #e9efff;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .accent { color: var(--brand); }
+    .ok { color: var(--ok); }
+    .warn { color: var(--warn); }
+
+    section {
+      padding: 30px 0;
+    }
+
+    .section-title {
+      font-size: clamp(1.7rem, 3vw, 2.4rem);
+      margin: 0 0 10px;
+      letter-spacing: -0.03em;
+    }
+
+    .section-copy {
+      color: var(--muted);
+      max-width: 760px;
+      margin-bottom: 22px;
+    }
+
+    .grid-3,
+    .grid-2 {
+      display: grid;
+      gap: 18px;
+    }
+
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .grid-2 { grid-template-columns: repeat(2, 1fr); }
+
+    .card {
+      padding: 22px;
+    }
+
+    .card h3 {
+      margin-top: 0;
+      margin-bottom: 8px;
+      font-size: 1.1rem;
+    }
+
+    .card p,
+    .card li,
+    .muted {
+      color: var(--muted);
+    }
+
+    .card ul {
+      padding-left: 18px;
+      margin: 10px 0 0;
+    }
+
+    .code-card {
+      overflow: hidden;
+    }
+
+    .code-card pre {
+      margin: 0;
+      padding: 22px;
+      overflow-x: auto;
+      font-size: 14px;
+    }
+
+    .steps {
+      counter-reset: item;
+      display: grid;
+      gap: 16px;
+    }
+
+    .step {
+      position: relative;
+      padding: 18px 18px 18px 68px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.03));
+      border: 1px solid var(--line);
+      border-radius: 18px;
+    }
+
+    .step::before {
+      counter-increment: item;
+      content: counter(item);
+      position: absolute;
+      left: 18px;
+      top: 18px;
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+      font-weight: 800;
+    }
+
+    .footer {
+      padding: 30px 0 60px;
+      color: var(--muted);
+      border-top: 1px solid var(--line);
+      margin-top: 28px;
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .pill {
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.04);
+      border-radius: 999px;
+      padding: 8px 12px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    @media (max-width: 980px) {
+      .hero-grid,
+      .grid-3,
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+
+      .nav-inner {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="container nav-inner">
+      <a class="brand" href="#top">
+        <span class="brand-badge">🧹</span>
+        <span>Release Clean</span>
+      </a>
+      <div class="nav-links">
+        <a href="#purpose">Purpose</a>
+        <a href="#workflow">Workflow</a>
+        <a href="#install">Install</a>
+        <a href="#usage">Usage</a>
+        <a class="button" href="https://github.com/argolo/release-clean" target="_blank" rel="noreferrer">GitHub</a>
+      </div>
+    </div>
+  </nav>
+
+  <header class="hero" id="top">
+    <div class="container hero-grid">
+      <div>
+        <div class="eyebrow">Deterministic Git cleanup and release checkout</div>
+        <h1>Protect your release process with a clean, reproducible local state.</h1>
+        <p class="lead">
+          Release Clean is a focused Python CLI that resets tracked changes, removes ignored files based on <code>.gitignore</code>, preserves <code>node_modules/</code>, synchronizes <code>main</code>, and positions your repository on the correct <code>release/&lt;VERSION&gt;</code> branch with a predictable sequence.
+        </p>
+        <div class="hero-actions">
+          <a class="button" href="#install">Get started</a>
+          <a class="ghost" href="https://pypi.org/project/release-clean/" target="_blank" rel="noreferrer">PyPI</a>
+          <a class="ghost" href="https://github.com/argolo/release-clean" target="_blank" rel="noreferrer">Repository</a>
+        </div>
+        <div class="pill-row">
+          <span class="pill">Python 3.9+</span>
+          <span class="pill">Zero external dependencies</span>
+          <span class="pill">Interactive confirmation</span>
+          <span class="pill">Audit-friendly summary</span>
+        </div>
+      </div>
+
+      <div class="hero-card">
+        <div class="terminal">
+          <div class="terminal-top">
+            <span class="dot red"></span>
+            <span class="dot yellow"></span>
+            <span class="dot green"></span>
+          </div>
+          <pre><span class="accent">$</span> release-clean
+Enter version (e.g. 2.100.1 or 2.100.1-hotfix): <span class="warn">2.100.1</span>
+
+<span class="accent">PRE-EXECUTION SUMMARY</span>
+1. git clean -fdX -e node_modules/
+2. git checkout -- .
+3. git checkout main
+4. git pull
+5. git fetch --all
+6. git checkout release/2.100.1
+7. git checkout -- .
+8. git pull origin release/2.100.1
+
+Continue? [y/N]: <span class="warn">y</span>
+
+<span class="ok">[EXEC]</span> git clean -fdX -e node_modules/
+<span class="ok">[EXEC]</span> git checkout main
+<span class="ok">[EXEC]</span> git checkout release/2.100.1
+<span class="ok">[OK]</span> Execution completed successfully.</pre>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section id="purpose">
+      <div class="container">
+        <h2 class="section-title">Why Release Clean exists</h2>
+        <p class="section-copy">
+          Local environments accumulate hidden state. Ignored files, leftover artifacts, outdated branches, and tracked changes can all distort release validation. Release Clean replaces manual cleanup with a deterministic, repeatable workflow that reduces uncertainty before you operate on a release branch.
+        </p>
+        <div class="grid-3">
+          <article class="card">
+            <h3>Deterministic by design</h3>
+            <p>Uses Git-native commands to clean ignored files, reset tracked changes, and synchronize the repository before release checkout.</p>
+          </article>
+          <article class="card">
+            <h3>Controlled execution</h3>
+            <p>Shows a clear pre-execution summary, asks for explicit confirmation, and stops immediately on the first failure.</p>
+          </article>
+          <article class="card">
+            <h3>Practical for real teams</h3>
+            <p>Preserves <code>node_modules/</code> while still removing ignored files that commonly pollute release validation workflows.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="workflow">
+      <div class="container">
+        <h2 class="section-title">Executed workflow</h2>
+        <p class="section-copy">
+          The sequence is intentional. It cleans ignored files, resets tracked state, synchronizes the base branch, checks out the target release branch, resets again, and updates it from origin.
+        </p>
+        <div class="code-card">
+          <pre>git clean -fdX -e node_modules/
+git checkout -- .
+git checkout main
+git pull
+git fetch --all
+git checkout release/&lt;VERSION&gt;
+git checkout -- .
+git pull origin release/&lt;VERSION&gt;</pre>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="container grid-2">
+        <div>
+          <h2 class="section-title">Key features</h2>
+          <div class="grid-2">
+            <article class="card">
+              <h3>Repository-aware cleanup</h3>
+              <p>Removes ignored files based on <code>.gitignore</code> using <code>git clean -fdX</code>, while excluding <code>node_modules/</code>.</p>
+            </article>
+            <article class="card">
+              <h3>Tracked reset</h3>
+              <p>Runs <code>git checkout -- .</code> before and after release checkout to prevent local state from leaking into validation.</p>
+            </article>
+            <article class="card">
+              <h3>Validation first</h3>
+              <p>Checks the current directory is inside a Git repository and validates the version format before building the branch name.</p>
+            </article>
+            <article class="card">
+              <h3>Audit-friendly output</h3>
+              <p>Records executed commands and prints a final summary with timestamps, repository path, version, branch, and status counts.</p>
+            </article>
+          </div>
+        </div>
+        <div>
+          <h2 class="section-title">Workflow rationale</h2>
+          <div class="steps">
+            <div class="step">
+              <strong>Clean ignored files</strong>
+              <div class="muted">Removes local artifacts defined by the repository itself, not by hardcoded assumptions.</div>
+            </div>
+            <div class="step">
+              <strong>Reset tracked changes</strong>
+              <div class="muted">Ensures the working tree returns to a known state before branch synchronization.</div>
+            </div>
+            <div class="step">
+              <strong>Sync main</strong>
+              <div class="muted">Updates the base branch so release checkout begins from an aligned local context.</div>
+            </div>
+            <div class="step">
+              <strong>Reinforce state after release checkout</strong>
+              <div class="muted">A second reset helps guarantee the release branch is not affected by leftover local state.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="install">
+      <div class="container grid-2">
+        <div>
+          <h2 class="section-title">Install</h2>
+          <p class="section-copy">The recommended way to install Release Clean as a global CLI is with <code>pipx</code>.</p>
+          <div class="code-card">
+            <pre>python3 -m pip install --user pipx
+python3 -m pipx ensurepath
+
+# restart your terminal
+pipx install release-clean</pre>
+          </div>
+        </div>
+        <div>
+          <h2 class="section-title">Local development</h2>
+          <p class="section-copy">To test from the project directory during development:</p>
+          <div class="code-card">
+            <pre>pip3 install -e .
+release-clean</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="usage">
+      <div class="container grid-2">
+        <div>
+          <h2 class="section-title">Usage</h2>
+          <div class="code-card">
+            <pre>release-clean</pre>
+          </div>
+          <p class="section-copy">Run the command from anywhere inside a Git repository. The utility will prompt for the version and then display the exact sequence it plans to execute.</p>
+        </div>
+        <div>
+          <h2 class="section-title">Accepted version examples</h2>
+          <div class="card">
+            <ul>
+              <li><code>1.0.0</code></li>
+              <li><code>2.100.1</code></li>
+              <li><code>2.100.1-hotfix</code></li>
+              <li><code>3.4.5-rc1</code></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <strong>Release Clean</strong>
+      <p>
+        A minimal tool with a strong purpose: enforce consistency, reduce uncertainty, and protect the integrity of your release process.
+      </p>
+      <p>
+        Built by <strong>André Argôlo</strong> · CTO · Software Architect · DevOps
+      </p>
+    </div>
+  </footer>
+</body>
+</html>
