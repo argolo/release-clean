@@ -14,7 +14,7 @@ authors = [
 ]
 
 [project.scripts]
-release-pilot = "release_clean:main"
+release-clean = "release_clean:main"
 
 [tool.setuptools]
 py-modules = ["release_clean"]
