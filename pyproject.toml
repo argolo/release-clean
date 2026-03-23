@@ -17,4 +17,4 @@ authors = [
 release-pilot = "release_clean:main"
 
 [tool.setuptools]
-py-modules = ["release_pilot"]
+py-modules = ["release_clean"]
