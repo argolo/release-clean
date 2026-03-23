@@ -1,4 +1,4 @@
-from release_clean.cli import (
+from release_clean import (
     build_context,
     format_release_branch,
     is_valid_version,
