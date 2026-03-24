@@ -389,9 +389,6 @@ def print_plan(ctx: ExecutionContext) -> None:
     print("\nWarning: this will discard tracked changes and remove ignored files.")
     print("Preserved from cleanup:")
     print("- node_modules/")
-    print("\nIgnored files cleanup command:")
-    print("- git clean -fdx -e node_modules/")
-
 
 def print_final_summary(ctx: ExecutionContext) -> None:
     """
@@ -409,10 +406,6 @@ def print_final_summary(ctx: ExecutionContext) -> None:
 
     print(f"\nSuccessful actions : {success_count}")
     print(f"Failed actions     : {fail_count}")
-
-    print("\nExecuted commands in order:")
-    for index, command in enumerate(ctx.executed_commands, start=1):
-        print(f"{index}. {command}")
 
     print("\nStatus:")
     print(
