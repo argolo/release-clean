@@ -357,12 +357,12 @@ def planned_commands(release_branch: str) -> list[str]:
     Examples
     --------
     >>> planned_commands("release/2.100.1")[0]
-    'git clean -fdX -e node_modules/'
+    'git clean -fdx -e node_modules/'
     >>> planned_commands("release/2.100.1")[-1]
     'git pull origin release/2.100.1'
     """
     return [
-        "git clean -fdX -e node_modules/",
+        "git clean -fdx -e node_modules/",
         "git checkout -- .",
         "git checkout main",
         "git pull",
@@ -390,7 +390,7 @@ def print_plan(ctx: ExecutionContext) -> None:
     print("Preserved from cleanup:")
     print("- node_modules/")
     print("\nIgnored files cleanup command:")
-    print("- git clean -fdX -e node_modules/")
+    print("- git clean -fdx -e node_modules/")
 
 
 def print_final_summary(ctx: ExecutionContext) -> None:
@@ -438,7 +438,7 @@ def execute_workflow(ctx: ExecutionContext) -> None:
     """
     _ = Path(ctx.repo_root)
 
-    run_command(["git", "clean", "-fdX", "-e", "node_modules/"], ctx)
+    run_command(["git", "clean", "-fdx", "-e", "node_modules/"], ctx)
     run_command(["git", "checkout", "--", "."], ctx)
     run_command(["git", "checkout", "main"], ctx)
     run_command(["git", "pull"], ctx)
