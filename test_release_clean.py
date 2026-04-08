@@ -1,6 +1,7 @@
 from release_clean import (
     build_context,
-    format_release_branch,
+    extract_version_from_branch,
+    is_valid_branch,
     is_valid_version,
     planned_commands,
     supports_color,
@@ -23,9 +24,27 @@ def test_is_valid_version_rejects_invalid_formats():
     assert is_valid_version("abc") is False
 
 
-def test_format_release_branch():
-    assert format_release_branch("2.100.1") == "release/2.100.1"
-    assert format_release_branch("2.100.1-hotfix") == "release/2.100.1-hotfix"
+def test_is_valid_branch_accepts_supported_formats():
+    assert is_valid_branch("release/1.0.0") is True
+    assert is_valid_branch("release/2.100.1-hotfix") is True
+    assert is_valid_branch("candidate/2.1.30") is True
+    assert is_valid_branch("pre-release/3.4.5-rc1") is True
+
+
+def test_is_valid_branch_rejects_invalid_formats():
+    assert is_valid_branch("") is False
+    assert is_valid_branch("1.0.0") is False
+    assert is_valid_branch("release/") is False
+    assert is_valid_branch("/1.0.0") is False
+    assert is_valid_branch("release/1.0") is False
+    assert is_valid_branch("release/hotfix/1.0.0") is False
+    assert is_valid_branch("release") is False
+
+
+def test_extract_version_from_branch():
+    assert extract_version_from_branch("release/2.100.1") == "2.100.1"
+    assert extract_version_from_branch("release/2.100.1-hotfix") == "2.100.1-hotfix"
+    assert extract_version_from_branch("candidate/2.1.30") == "2.1.30"
 
 
 def test_planned_commands_has_expected_length():
@@ -35,7 +54,7 @@ def test_planned_commands_has_expected_length():
 
 def test_planned_commands_starts_with_git_clean_preserving_node_modules():
     commands = planned_commands("release/2.100.1")
-    assert commands[0] == "git clean -fdX -e node_modules/"
+    assert commands[0] == "git clean -fdx -e node_modules/"
 
 
 def test_planned_commands_contains_main_sync_steps_in_order():
@@ -63,7 +82,7 @@ def test_planned_commands_ends_with_release_pull():
 
 
 def test_build_context():
-    ctx = build_context("1.0.0", "/tmp/repo")
+    ctx = build_context("release/1.0.0", "/tmp/repo")
 
     assert ctx.version == "1.0.0"
     assert ctx.release_branch == "release/1.0.0"
