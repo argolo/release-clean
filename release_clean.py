@@ -417,7 +417,6 @@ def print_plan(ctx: ExecutionContext) -> None:
     print(f"Repository directory : {ctx.repo_root}")
     print(f"Provided branch      : {ctx.release_branch}")
     print(f"Extracted version    : {ctx.version}")
-    print(f"Target branch        : {ctx.release_branch}")
 
     print("\nThe utility will execute the following steps in this order:")
     for index, command in enumerate(planned_commands(ctx.release_branch), start=1):
@@ -436,7 +435,6 @@ def print_final_summary(ctx: ExecutionContext) -> None:
     print(f"Started at      : {ctx.started_at}")
     print(f"Finished at     : {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"Repository      : {ctx.repo_root}")
-    print(f"Branch          : {ctx.release_branch}")
     print(f"Version         : {ctx.version}")
     print(f"Final branch    : {ctx.release_branch}")
 
