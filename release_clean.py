@@ -7,7 +7,7 @@ synchronize Git references, and switch to a target release branch.
 
 The tool is intentionally conservative:
 - it validates the current directory is a Git repository
-- it validates the version before building the branch name
+- it validates the branch format before execution
 - it shows a clear destructive-action summary before execution
 - it requires explicit confirmation
 - it stops at the first failure
@@ -42,6 +42,7 @@ from typing import Sequence
 
 
 VERSION_PATTERN = re.compile(r"^\d+\.\d+\.\d+(?:-[A-Za-z0-9._-]+)?$")
+BRANCH_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9._-]*/\d+\.\d+\.\d+(?:-[A-Za-z0-9._-]+)?$")
 
 
 def supports_color() -> bool:
@@ -153,30 +154,6 @@ def print_header(title: str) -> None:
     print(f"\n{line}\n{title}\n{line}")
 
 
-def format_release_branch(version: str) -> str:
-    """
-    Build the target release branch name.
-
-    Parameters
-    ----------
-    version:
-        Release version already validated by ``is_valid_version``.
-
-    Returns
-    -------
-    str
-        Branch name in the form ``release/<version>``.
-
-    Examples
-    --------
-    >>> format_release_branch("2.100.1")
-    'release/2.100.1'
-    >>> format_release_branch("2.100.1-hotfix")
-    'release/2.100.1-hotfix'
-    """
-    return f"release/{version}"
-
-
 def is_valid_version(version: str) -> bool:
     """
     Validate supported release version formats.
@@ -203,32 +180,91 @@ def is_valid_version(version: str) -> bool:
     return bool(VERSION_PATTERN.fullmatch(version.strip()))
 
 
-def prompt_version() -> str:
+def is_valid_branch(branch: str) -> bool:
     """
-    Prompt the user for a version and validate it.
+    Validate branch format as <suffix>/<version>.
+
+    Accepted examples:
+    - release/1.0.0
+    - release/2.100.1-hotfix
+    - candidate/2.1.30
+
+    Examples
+    --------
+    >>> is_valid_branch("release/1.0.0")
+    True
+    >>> is_valid_branch("candidate/2.1.30")
+    True
+    >>> is_valid_branch("release/hotfix/1.0.0")
+    False
+    >>> is_valid_branch("release/")
+    False
+    >>> is_valid_branch("1.0.0")
+    False
+    """
+    return bool(BRANCH_PATTERN.fullmatch(branch.strip()))
+
+
+def extract_version_from_branch(branch: str) -> str:
+    """
+    Extract the version portion from a valid branch string.
+
+    Parameters
+    ----------
+    branch:
+        Branch in the format <suffix>/<version>.
 
     Returns
     -------
     str
-        A valid version string.
+        Extracted version.
+
+    Examples
+    --------
+    >>> extract_version_from_branch("release/1.0.0")
+    '1.0.0'
+    >>> extract_version_from_branch("candidate/2.1.30")
+    '2.1.30'
+    """
+    _, version = branch.strip().split("/", 1)
+    return version
+
+
+def prompt_branch() -> str:
+    """
+    Prompt the user for a branch and validate it.
+
+    Returns
+    -------
+    str
+        A valid branch string.
 
     Raises
     ------
     ReleaseCleanError
-        If the version is empty or invalid.
+        If the branch is empty or invalid.
     """
-    version = input("Enter version (e.g. 2.100.1 or 2.100.1-hotfix): ").strip()
+    branch = input(
+        "Enter branch (e.g. release/2.100.1-hotfix or candidate/2.1.30): "
+    ).strip()
 
-    if not version:
-        raise ReleaseCleanError("No version was provided.")
+    if not branch:
+        raise ReleaseCleanError("No branch was provided.")
 
+    if not is_valid_branch(branch):
+        raise ReleaseCleanError(
+            "Invalid branch format. Expected: <suffix>/<version>. "
+            "Examples: release/1.0.0, release/2.100.1-hotfix, candidate/2.1.30."
+        )
+
+    version = extract_version_from_branch(branch)
     if not is_valid_version(version):
         raise ReleaseCleanError(
-            "Invalid version format. Expected examples: "
+            "Invalid version format inside branch. Expected SemVer-like examples: "
             "1.0.0, 2.100.1, 2.100.1-hotfix."
         )
 
-    return version
+    return branch
 
 
 def confirm(prompt: str = "Continue? [y/N]: ") -> bool:
@@ -379,7 +415,8 @@ def print_plan(ctx: ExecutionContext) -> None:
     """
     print_header("PRE-EXECUTION SUMMARY")
     print(f"Repository directory : {ctx.repo_root}")
-    print(f"Provided version     : {ctx.version}")
+    print(f"Provided branch      : {ctx.release_branch}")
+    print(f"Extracted version    : {ctx.version}")
     print(f"Target branch        : {ctx.release_branch}")
 
     print("\nThe utility will execute the following steps in this order:")
@@ -390,6 +427,7 @@ def print_plan(ctx: ExecutionContext) -> None:
     print("Preserved from cleanup:")
     print("- node_modules/")
 
+
 def print_final_summary(ctx: ExecutionContext) -> None:
     """
     Print the final execution summary and audit trail.
@@ -398,6 +436,7 @@ def print_final_summary(ctx: ExecutionContext) -> None:
     print(f"Started at      : {ctx.started_at}")
     print(f"Finished at     : {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"Repository      : {ctx.repo_root}")
+    print(f"Branch          : {ctx.release_branch}")
     print(f"Version         : {ctx.version}")
     print(f"Final branch    : {ctx.release_branch}")
 
@@ -411,7 +450,7 @@ def print_final_summary(ctx: ExecutionContext) -> None:
     print(
         "Execution completed successfully. Ignored files were cleaned "
         "(preserving node_modules/), main was synchronized, and the "
-        "requested release branch was checked out."
+        "requested branch was checked out."
     )
 
 
@@ -441,21 +480,23 @@ def execute_workflow(ctx: ExecutionContext) -> None:
     run_command(["git", "pull", "origin", ctx.release_branch], ctx)
 
 
-def build_context(version: str, repo_root: str) -> ExecutionContext:
+def build_context(branch: str, repo_root: str) -> ExecutionContext:
     """
     Build the execution context from validated inputs.
 
     Examples
     --------
-    >>> ctx = build_context("1.0.0", "/repo")
+    >>> ctx = build_context("release/1.0.0", "/repo")
     >>> ctx.release_branch
     'release/1.0.0'
+    >>> ctx.version
+    '1.0.0'
     >>> ctx.repo_root
     '/repo'
     """
     return ExecutionContext(
-        version=version,
-        release_branch=format_release_branch(version),
+        version=extract_version_from_branch(branch),
+        release_branch=branch,
         repo_root=repo_root,
         color_enabled=supports_color(),
     )
@@ -471,8 +512,8 @@ def main() -> None:
         repo_root = resolve_git_repo_root()
         os.chdir(repo_root)
 
-        version = prompt_version()
-        ctx = build_context(version, repo_root)
+        branch = prompt_branch()
+        ctx = build_context(branch, repo_root)
 
         print_plan(ctx)
 
