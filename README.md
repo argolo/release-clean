@@ -47,7 +47,7 @@ The solution is not manual cleanup — it is **deterministic cleanup based on th
 
   * `git checkout -- .`
 * 🌿 Safe synchronization of `main`
-* 🚀 Deterministic checkout of `release/<VERSION>`
+* 🚀 Deterministic checkout of `<SUFFIX>/<VERSION>`
 * 🔁 Pull of remote release branch
 * 🔍 Validation of:
 
@@ -88,9 +88,9 @@ git checkout -- .
 git checkout main
 git pull
 git fetch --all
-git checkout release/<VERSION>
+git checkout <SUFFIX>/<VERSION>
 git checkout -- .
-git pull origin release/<VERSION>
+git pull origin <SUFFIX>/<VERSION>
 ```
 
 ---
@@ -133,7 +133,7 @@ git fetch --all
 ### 4. Switch to release branch
 
 ```bash
-git checkout release/<VERSION>
+git checkout <SUFFIX>/<VERSION>
 ```
 
 ---
@@ -151,7 +151,7 @@ git checkout -- .
 ### 6. Update release branch
 
 ```bash
-git pull origin release/<VERSION>
+git pull origin <SUFFIX>/<VERSION>
 ```
 
 ---
@@ -163,33 +163,10 @@ git pull origin release/<VERSION>
 * Python **3.9+**
 * Git installed and available in PATH
 
----
-
-## 🍎 macOS Installation (recommended)
-
-### 1️⃣ Install `pipx`
-
-```bash
-python3 -m pip install --user pipx
-python3 -m pipx ensurepath
-```
-
-> ⚠️ Restart your terminal after installation.
-
----
-
-### 2️⃣ Navigate to project directory
-
-```bash
-cd release-clean
-```
-
----
-
 ### 3️⃣ Install globally
 
 ```bash
-pipx install .
+pip3 install release-clean
 ```
 
 Now the command is available globally:
@@ -214,7 +191,7 @@ If the interactive prompt appears, installation is successful ✅
 
 ```bash
 which release-clean
-pipx list
+pip3 list
 ```
 
 ---
@@ -222,7 +199,7 @@ pipx list
 ### 🧹 Updating
 
 ```bash
-pipx reinstall release-clean
+pip install -U release-clean
 ```
 
 ---
@@ -230,7 +207,7 @@ pipx reinstall release-clean
 ### ❌ Uninstall
 
 ```bash
-pipx uninstall release-clean
+pip3 uninstall release-clean
 ```
 
 ---
@@ -246,7 +223,6 @@ pipx uninstall release-clean
 ### 🧠 Rule of Thumb
 
 > Python library → `pip install`
-> Python CLI tool → `pipx install`
 
 ---
 
@@ -262,31 +238,66 @@ release-clean
 
 ## 🔄 Execution Flow
 
-1. Prompt for version
-2. Validate version format
-3. Validate Git repository
-4. Display execution plan
-5. Request confirmation (`y/N`)
-6. Execute workflow
-7. Stop on first failure
-8. Print final summary
+1. Prompt for branch
+2. Validate branch format
+3. Extract version from branch
+4. Validate extracted version format
+5. Validate Git repository
+6. Display execution plan
+7. Request confirmation (`y/N`)
+8. Execute workflow
+9. Stop on first failure
+10. Print final summary
 
 ---
 
-## 📌 Version Format
+## 📌 Branch Format
 
-Accepted formats:
+The input must follow this rule:
+
+```text
+<SUFFIX>/<VERSION>
+```
+
+Where:
+
+* `SUFFIX` must be a string
+* `VERSION` must follow the accepted SemVer-like pattern used by the tool
+
+Accepted examples:
+
+* `release/1.0.0`
+* `release/2.100.1-hotfix`
+* `candidate/2.1.30`
+* `pre-release/3.4.5-rc1`
+
+Invalid examples:
+
+* `1.0.0`
+* `release/`
+* `/1.0.0`
+* `release/hotfix/1.0.0`
+* empty values
+
+---
+
+## 📌 Extracted Version Format
+
+The version is extracted from the branch using the portion after the first `/`.
+
+Accepted extracted versions:
 
 * `1.0.0`
 * `2.100.1`
 * `2.100.1-hotfix`
 * `3.4.5-rc1`
 
-Invalid examples:
+Invalid extracted versions:
 
 * `1.0`
-* `release/1.0.0`
-* empty values
+* `v1.0.0`
+* `abc`
+
 
 ---
 
@@ -341,7 +352,7 @@ At the end, Release Clean prints:
 
 * Preparing local environment before a release
 * Eliminating “works on my machine” issues
-* Teams using `release/<version>` strategy
+* Teams using strategies such as: `release/<version>`; `candidate/<version>`; other `<suffix>/<version>` conventions
 * Multi-developer environments
 * Regulated or mission-critical systems
 
